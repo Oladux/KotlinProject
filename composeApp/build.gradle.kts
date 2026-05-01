@@ -32,6 +32,8 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+            implementation(compose.materialIconsExtended)
+
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -72,6 +74,7 @@ android {
 
 dependencies {
     debugImplementation(libs.compose.uiTooling)
+
 }
 
 compose.desktop {
