@@ -148,7 +148,7 @@ fun ListScreen(
                         shoppingList[index] = item.copy(bought = it)
                     },
                     onDelete = { onDelete(index) }
-            }
+                )
             }
         }
     }
