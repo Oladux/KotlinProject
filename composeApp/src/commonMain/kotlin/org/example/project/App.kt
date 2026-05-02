@@ -18,6 +18,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.ui.text.style.TextDecoration
+import kotlinx.coroutines.CoroutineScope
+import org.example.project.network.ProductRepository
 
 enum class Screen {
     LIST,
@@ -39,21 +41,19 @@ fun ShoppingListElement(
     onDelete: () -> Unit
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
+
         Checkbox(
             checked = item.bought,
             onCheckedChange = onBoughtChange
         )
 
         Text(
-            item.description,
-            modifier = Modifier.weight(1f),
-            textDecoration = if (item.bought) TextDecoration.LineThrough else null
+            text = item.description,
+            modifier = Modifier.weight(1f)
         )
 
-        if (!item.bought) {
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Удалить")
-            }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Default.Delete, contentDescription = "Удалить")
         }
     }
 }
@@ -61,37 +61,39 @@ fun ShoppingListElement(
 @Composable
 fun ListScreen(
     shoppingList: MutableList<ShoppingListItem>,
-    onDeleteRequest: (Int) -> Unit,
     onAdd: (String) -> Unit,
-    snackbarHostState: SnackbarHostState
+    onDelete: (Int) -> Unit,
+    snackbarHostState: SnackbarHostState,
+    repository: ProductRepository,
+    scope: CoroutineScope,
+    onLoadingChange: (Boolean) -> Unit,
+    onLastProduct: (String) -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-    var newItemDesc by remember { mutableStateOf("") }
+
+    var input by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxSize()) {
 
-        Text(
-            "Список покупок",
-            style = MaterialTheme.typography.headlineMedium
-        )
+        Text("Список покупок", style = MaterialTheme.typography.headlineMedium)
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(Modifier.height(12.dp))
+
 
         Row {
+
             OutlinedTextField(
-                value = newItemDesc,
-                onValueChange = { newItemDesc = it },
+                value = input,
+                onValueChange = { input = it },
                 modifier = Modifier.weight(1f),
-                label = { Text("Название продукта") }
+                label = { Text("Продукт") }
             )
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(Modifier.width(8.dp))
 
             Button(onClick = {
-                if (newItemDesc.isNotBlank()) {
-                    onAdd(newItemDesc)
-                    newItemDesc = ""
-
+                if (input.isNotBlank()) {
+                    onAdd(input)
+                    input = ""
                     scope.launch {
                         snackbarHostState.showSnackbar("Добавлено")
                     }
@@ -101,51 +103,80 @@ fun ListScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize()
-        ) {
+
+        Button(onClick = {
+            scope.launch {
+                try {
+                    onLoadingChange(true)
+
+                    val result = repository.fetchProduct()
+
+                    onLoadingChange(false)
+
+                    result.onSuccess {
+                        onLastProduct(it.title)
+                        snackbarHostState.showSnackbar("OK: ${it.title}")
+                    }
+
+                    result.onFailure {
+                        snackbarHostState.showSnackbar(it.message ?: "Ошибка")
+                    }
+
+                } catch (e: Exception) {
+                    onLoadingChange(false)
+                    snackbarHostState.showSnackbar("Crash: ${e.message}")
+                }
+            }
+        }) {
+            Text("Загрузить продукт из интернета")
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        LazyColumn {
+
             itemsIndexed(shoppingList) { index, item ->
 
                 ShoppingListElement(
                     item = item,
-                    onBoughtChange = { checked ->
-                        shoppingList[index] = item.copy(bought = checked)
+                    onBoughtChange = {
+                        shoppingList[index] = item.copy(bought = it)
                     },
-                    onDelete = {
-                        onDeleteRequest(index)
-                    }
+                    onDelete = { onDelete(index) }
                 )
-                
+
+                Divider()
             }
         }
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
+}@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App() {
-    val darkThemeFlag = isSystemInDarkTheme()
-    val theme = if (darkThemeFlag) DarkScheme else LightScheme
 
-    val milkText = stringResource(Res.string.milk)
-    val flourText = stringResource(Res.string.flour)
+    val darkThemeFlag = isSystemInDarkTheme()
+    val theme = if (darkThemeFlag)
+        DarkScheme
+    else
+        LightScheme
+
+    val repository = remember { ProductRepository() }
 
     val shoppingList = remember {
         mutableStateListOf(
-            ShoppingListItem(milkText),
-            ShoppingListItem(flourText)
+            ShoppingListItem("Milk"),
+            ShoppingListItem("Flour")
         )
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    var itemToDeleteIndex by remember { mutableStateOf<Int?>(null) }
-
     var currentScreen by remember { mutableStateOf(Screen.LIST) }
 
+    var loading by remember { mutableStateOf(false) }
+    var lastProduct by remember { mutableStateOf<String?>(null) }
 
     MaterialTheme(colorScheme = theme) {
 
@@ -155,84 +186,54 @@ fun App() {
                     title = {
                         Text(
                             when (currentScreen) {
-                                Screen.LIST -> "Список покупок"
+                                Screen.LIST -> "Список"
                                 Screen.ABOUT -> "О приложении"
                             }
                         )
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            currentScreen = Screen.ABOUT
+                        }) {
+                            Icon(Icons.Default.Info, null)
+                        }
                     },
                     navigationIcon = {
                         if (currentScreen == Screen.ABOUT) {
                             IconButton(onClick = {
                                 currentScreen = Screen.LIST
                             }) {
-                                Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
-                            }
-                        }
-                    },
-                    actions = {
-                        if (currentScreen == Screen.LIST) {
-                            IconButton(onClick = {
-                                currentScreen = Screen.ABOUT
-                            }) {
-                                Icon(Icons.Default.Info, contentDescription = "О приложении")
+                                Icon(Icons.Default.ArrowBack, null)
                             }
                         }
                     }
                 )
             },
             snackbarHost = { SnackbarHost(snackbarHostState) }
-        ) { paddingValues ->
-
-            if (itemToDeleteIndex != null) {
-                AlertDialog(
-                    onDismissRequest = { itemToDeleteIndex = null },
-                    title = { Text("Удаление") },
-                    text = { Text("Удалить элемент?") },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            itemToDeleteIndex?.let {
-                                shoppingList.removeAt(it)
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("Удалено")
-                                }
-                            }
-                            itemToDeleteIndex = null
-                        }) {
-                            Text("Да")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { itemToDeleteIndex = null }) {
-                            Text("Нет")
-                        }
-                    }
-                )
-            }
+        ) { padding ->
 
             Row(
                 modifier = Modifier
-                    .padding(paddingValues)
+                    .padding(padding)
                     .fillMaxSize()
             ) {
-
 
                 NavigationRail {
 
                     NavigationRailItem(
                         selected = currentScreen == Screen.LIST,
                         onClick = { currentScreen = Screen.LIST },
-                        icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                        icon = { Icon(Icons.Default.Home, null) },
                         label = { Text("Список") }
                     )
 
                     NavigationRailItem(
                         selected = currentScreen == Screen.ABOUT,
                         onClick = { currentScreen = Screen.ABOUT },
-                        icon = { Icon(Icons.Default.Info, contentDescription = null) },
+                        icon = { Icon(Icons.Default.Info, null) },
                         label = { Text("О программе") }
                     )
                 }
-
 
                 Box(
                     modifier = Modifier
@@ -244,23 +245,34 @@ fun App() {
                     when (currentScreen) {
 
                         Screen.LIST -> {
+
+                            if (loading) {
+                                CircularProgressIndicator()
+                            }
+
+                            lastProduct?.let {
+                                Text("Последний продукт: $it")
+                                Spacer(Modifier.height(8.dp))
+                            }
+
                             ListScreen(
                                 shoppingList = shoppingList,
-                                onDeleteRequest = { itemToDeleteIndex = it },
-                                onAdd = {
-                                    shoppingList.add(ShoppingListItem(it.trim()))
-                                },
-                                snackbarHostState = snackbarHostState
+                                onAdd = { shoppingList.add(ShoppingListItem(it)) },
+                                onDelete = { shoppingList.removeAt(it) },
+                                snackbarHostState = snackbarHostState,
+                                repository = repository,
+                                scope = scope,
+                                onLoadingChange = { loading = it },
+                                onLastProduct = { lastProduct = it }
                             )
                         }
 
                         Screen.ABOUT -> {
-                            Column(
-                                verticalArrangement = Arrangement.Center,
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.fillMaxSize()
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text("Это простое приложение\nдля списка покупок")
+                                Text("Простое приложение списка покупок")
                             }
                         }
                     }
