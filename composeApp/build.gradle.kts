@@ -33,6 +33,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
             implementation(compose.materialIconsExtended)
+            implementation(compose.components.resources)
 
         }
         commonTest.dependencies {
@@ -87,4 +88,10 @@ compose.desktop {
             packageVersion = "1.0.0"
         }
     }
+}
+
+compose.resources {
+    publicResClass = true
+    packageOfResClass = "kotlinproject.composeapp.generated.resources"
+    generateResClass = always
 }

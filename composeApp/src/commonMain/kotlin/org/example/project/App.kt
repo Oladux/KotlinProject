@@ -12,6 +12,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinproject.composeapp.generated.resources.Res
+import kotlinproject.composeapp.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 
 data class ShoppingListItem(
     val description: String,
@@ -20,8 +23,10 @@ data class ShoppingListItem(
 
 @Composable
 fun App() {
+    val milkText = stringResource(Res.string.milk)
+    val flourText = stringResource(Res.string.flour)
     val shoppingList = remember {
-        mutableStateListOf(ShoppingListItem("Молоко"), ShoppingListItem("Мука"))
+        mutableStateListOf(ShoppingListItem(milkText), ShoppingListItem(flourText))
     }
     var newItemDesc by remember { mutableStateOf("") }
     LazyColumn {
