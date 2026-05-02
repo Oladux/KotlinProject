@@ -10,6 +10,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import org.example.project.data.ThemeStorage
 import kotlinx.coroutines.launch
 import kotlinproject.composeapp.generated.resources.Res
 import kotlinproject.composeapp.generated.resources.*
@@ -145,9 +148,7 @@ fun ListScreen(
                         shoppingList[index] = item.copy(bought = it)
                     },
                     onDelete = { onDelete(index) }
-                )
-
-                Divider()
+            }
             }
         }
     }
@@ -155,11 +156,6 @@ fun ListScreen(
 @Composable
 fun App() {
 
-    val darkThemeFlag = isSystemInDarkTheme()
-    val theme = if (darkThemeFlag)
-        DarkScheme
-    else
-        LightScheme
 
     val repository = remember { ProductRepository() }
 
@@ -170,15 +166,20 @@ fun App() {
         )
     }
 
-    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+
+    var isDarkTheme by remember { mutableStateOf(false) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var currentScreen by remember { mutableStateOf(Screen.LIST) }
 
     var loading by remember { mutableStateOf(false) }
     var lastProduct by remember { mutableStateOf<String?>(null) }
 
-    MaterialTheme(colorScheme = theme) {
+    MaterialTheme(
+        colorScheme = if (isDarkTheme) DarkScheme else LightScheme
+    ) {
 
         Scaffold(
             topBar = {
@@ -193,11 +194,16 @@ fun App() {
                     },
                     actions = {
                         IconButton(onClick = {
-                            currentScreen = Screen.ABOUT
+                            isDarkTheme = !isDarkTheme
                         }) {
-                            Icon(Icons.Default.Info, null)
-                        }
-                    },
+                            Icon(
+                                imageVector = if (isDarkTheme)
+                                    Icons.Default.LightMode
+                                else
+                                    Icons.Default.DarkMode,
+                                contentDescription = null
+                            )
+                        }},
                     navigationIcon = {
                         if (currentScreen == Screen.ABOUT) {
                             IconButton(onClick = {
